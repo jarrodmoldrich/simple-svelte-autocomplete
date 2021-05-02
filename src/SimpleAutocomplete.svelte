@@ -44,6 +44,9 @@
   };
   export let onChange = function(newSelectedItem) {};
 
+  export let onOpen = function() {};
+  export let onClose = function() {};
+
   // Behaviour properties
   export let selectFirstIfEmpty = false;
   export let minCharactersToSearch = 1;
@@ -90,6 +93,8 @@
   export let disabled = false;
 
   export let debug = false;
+
+  export let zIndex = 0;
 
   // --- Public State ----
 
@@ -266,12 +271,16 @@
 
   async function search() {
     let tStart;
+    let searchText = text;
+    console.log(text);
+    if (!searchText && selectedItem) searchText = safeLabelFunction(selectedItem);
+    if (!searchText && placeholder) searchText = placeholder;
     if (debug) {
       tStart = performance.now();
-      console.log("Searching user entered text: '" + text + "'");
+      console.log("Searching user entered text: '" + searchText + "'");
     }
 
-    const textFiltered = prepareUserEnteredText(text);
+    const textFiltered = prepareUserEnteredText(searchText);
 
     if (textFiltered === "") {
       filteredListItems = listItems;
@@ -389,25 +398,7 @@
     if (debug) {
       console.log("Seaching DOM element: " + query + " in " + list);
     }
-    const el = list && list.querySelector(query);
-    if (el) {
-      if (typeof el.scrollIntoViewIfNeeded === "function") {
-        if (debug) {
-          console.log("Scrolling selected item into view");
-        }
-        el.scrollIntoViewIfNeeded();
-      } else {
-        if (debug) {
-          console.warn(
-            "Could not scroll selected item into view, scrollIntoViewIfNeeded not supported"
-          );
-        }
-      }
-    } else {
-      if (debug) {
-        console.warn("Selected item not found to scroll into view");
-      }
-    }
+    search();
   }
 
   function onListItemClick(listItem) {
@@ -567,12 +558,12 @@
       console.log("open");
     }
 
-    // check if the search text has more than the min chars required
-    if (isMinCharsToSearchReached()) {
-      return;
-    }
-
+    let wasOpened = opened;
     opened = true;
+    if (!wasOpened) {
+      text = "";
+      onOpen();
+    }
   }
 
   function close() {
@@ -584,7 +575,10 @@
     if (!text && selectFirstIfEmpty) {
       highlightFilter = 0;
       selectItem();
+    } else {
+      text = safeLabelFunction(selectedItem);
     }
+    onClose();
   }
 
   function isMinCharsToSearchReached() {
@@ -755,7 +749,8 @@
 <div
   class="{className ? className : ''}
   {hideArrow ? 'hide-arrow is-multiple' : ''}
-  {showClear ? 'show-clear' : ''} autocomplete select is-fullwidth {uniqueId}">
+  {showClear ? 'show-clear' : ''} autocomplete select is-fullwidth {uniqueId}"
+  style="z-index: {zIndex}">
   <input
     type="text"
     class="{inputClassName ? inputClassName : ''} input autocomplete-input"
