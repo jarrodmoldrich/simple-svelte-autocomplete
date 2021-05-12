@@ -163,13 +163,10 @@
   }
 
   function safeLabelFunction(item) {
-    // console.log("labelFunction: " + labelFunction);
-    // console.log("safeLabelFunction, item: " + item);
     return safeStringFunction(labelFunction, item);
   }
 
   function safeKeywordsFunction(item) {
-    // console.log("safeKeywordsFunction");
     const keywords = safeStringFunction(keywordsFunction, item);
     let result = safeStringFunction(keywordsCleanFunction, keywords);
     result = result.toLowerCase().trim();
@@ -272,7 +269,6 @@
   async function search() {
     let tStart;
     let searchText = text;
-    console.log(text);
     if (!searchText && selectedItem) searchText = safeLabelFunction(selectedItem);
     if (!searchText && placeholder) searchText = placeholder;
     if (debug) {
@@ -369,26 +365,6 @@
     }
   }
 
-  function up() {
-    if (debug) {
-      console.log("up");
-    }
-
-    open();
-    if (highlightIndex > 0) highlightIndex--;
-    highlight();
-  }
-
-  function down() {
-    if (debug) {
-      console.log("down");
-    }
-
-    open();
-    if (highlightIndex < filteredListItems.length - 1) highlightIndex++;
-    highlight();
-  }
-
   function highlight() {
     if (debug) {
       console.log("highlight");
@@ -401,14 +377,53 @@
     search();
   }
 
+  function doClick(listItem) {
+    if (selectListItem(listItem)) {
+      close();
+    }
+  }
+
+  function focusNextItem(index, offset) {
+    let children = list.children;
+    index += offset;
+    if (index < -1) index = -1;
+    if (index >= filteredListItems.length) {
+      index = filteredListItems.length - 1;
+    }
+    if (index == -1) {
+      input.focus();
+    } else {
+      let child = children.item(index);
+      child.focus();
+    }
+  }
+
+  function onListItemKeyDown(event, listItem, index) {
+    if (debug) {
+      console.log("onListItemKeyDown: " + event.code);
+    }
+
+    let last = index == Math.min(maxItemsToShowInList, filteredListItems.length) - 1;
+
+    if (event.code == "ArrowUp") {
+      focusNextItem(index, -1);
+      event.preventDefault();
+    } else if (event.code == "ArrowDown") {
+      focusNextItem(index, 1);
+      event.preventDefault();
+    } else if (event.code == "Space" || event.code == "Enter") {
+      doClick(listItem);
+      event.preventDefault();
+    } else if (event.key == "Tab" && !event.shiftKey && last) {
+      close();
+    }
+  }
+
   function onListItemClick(listItem) {
     if (debug) {
       console.log("onListItemClick");
     }
-
-    if (selectListItem(listItem)) {
-      close();
-    }
+    doClick(listItem);
   }
 
   function onDocumentClick(e) {
@@ -419,7 +434,6 @@
       if (debug) {
         console.log("onDocumentClick inside");
       }
-      // resetListToAllItemsAndOpen();
       highlight();
     } else {
       if (debug) {
@@ -431,22 +445,17 @@
 
   function onKeyDown(e) {
     if (debug) {
-      console.log("onKeyDown");
+      console.log("onKeyDown: " + e.key + " " + e.code);
     }
 
-    let key = e.key;
-    if (key === "Tab" && e.shiftKey) key = "ShiftTab";
-    const fnmap = {
-      Tab: opened ? down.bind(this) : null,
-      ShiftTab: opened ? up.bind(this) : null,
-      ArrowDown: down.bind(this),
-      ArrowUp: up.bind(this),
-      Escape: onEsc.bind(this)
-    };
-    const fn = fnmap[key];
-    if (typeof fn === "function") {
+    if (e.code == "ArrowDown") {
+      focusNextItem(-1, 1);
       e.preventDefault();
-      fn(e);
+    } else if (e.key === "Tab" && e.shiftKey) {
+      close();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      onEsc(e);
     }
   }
 
@@ -607,12 +616,6 @@
     });
   }
 
-  function onBlur() {
-    if (debug) {
-      console.log("onBlur");
-    }
-    close();
-  }
   // 'item number one'.replace(/(it)(.*)(nu)(.*)(one)/ig, '<b>$1</b>$2 <b>$3</b>$4 <b>$5</b>')
   function highlightFilter(q, fields) {
     const qs = "(" + q.trim().replace(/\s/g, ")(.*)(") + ")";
@@ -760,6 +763,7 @@
     {name}
     {disabled}
     {title}
+    aria-expanded={showList && filteredListItems && filteredListItems.length > 0}
     bind:this={input}
     bind:value={text}
     on:input={onInput}
@@ -780,20 +784,20 @@
           {#if listItem}
             <div
               class="autocomplete-list-item {i === highlightIndex ? 'selected' : ''}"
+              tabindex="0"
+              role="button"
+              aria-label={listItem.label}
+              aria-pressed={i === highlightIndex}
+              on:keydown={(e) => onListItemKeyDown(e, listItem, i)}
               on:click={() => onListItemClick(listItem)}
               on:pointerenter={() => {
                 highlightIndex = i;
               }}>
-              <slot
-                name="item"
-                item={listItem.item}
-                label={listItem.highlighted ? listItem.highlighted.label : listItem.label}>
-                {#if listItem.highlighted}
-                  {@html listItem.highlighted.label}
-                {:else}
-                  {@html listItem.label}
-                {/if}
-              </slot>
+              {#if listItem.highlighted}
+                {@html listItem.highlighted.label}
+              {:else}
+                {@html listItem.label}
+              {/if}
             </div>
           {/if}
         {/if}
